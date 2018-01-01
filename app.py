@@ -1,6 +1,7 @@
 import time
 import json
 from cuepy import CorsairSDK
+from datetime import datetime, timedelta
 from itertools import cycle
 
 ### Setup ###
@@ -12,12 +13,15 @@ LED_SCROLL = 150
 
 # Timer Settings (all in seconds)
 LED_DELAY = 1
+hb_threshold = 5 # Time in minutes
+iso_format = '%Y-%m-%dT%H:%M:%S' # Used to parse hb back into object
 
 #Corsair SDK library location
 sdk = CorsairSDK("C:\\CUESDK.x64_2013.dll")
 ### End Setup ###
 
 ### Warning Colors ###
+ALERT_HB = [255,0,0]
 ALERT_TMHP = [255,255,0]
 ALERT_MDS = [255,0,0]
 ALERT_PBJ = [255,255,0]
@@ -63,6 +67,15 @@ def process_leds(device, queus):
            time.sleep(LED_DELAY)
 
 
+# HB processing logic
+def bad_hb(heartbeat, th):
+    # Remove the microseconds to make it easier on ourselves
+    heartbeat = heartbeat.split('.')[0]
+    hb = datetime.strptime(heartbeat, iso_format)
+    deadline = datetime.utcnow() - timedelta(minutes=th)
+    return deadline > hb
+
+
 # Message Processing 
 def process_msg(message):
 
@@ -74,10 +87,9 @@ def process_msg(message):
     print('Processing Message: \n{}'.format(msg))
 
     # Make sure heartbeat isn't behind
-    # TODO: DO THIS WHEN THE DATE CONVERSION IS FIGUED OUT
-    #hb = datetime.utcnow(msg['heartbeat'])
 
-    if(msg['tmhp_up'] == False): led_queue['logo'].append(ALERT_TMHP)
+    if bad_hb(msg['hb'], hb_threshold): led_queue['logo'].append(ALERT_HB)
+    if msg['tmhp_up'] == False: led_queue['logo'].append(ALERT_TMHP)
 
     # Check for any alerts
     for a in msg['alerts']:

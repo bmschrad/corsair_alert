@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 def gen_msg(hb = '', tmhp_up = True):
     msg = {}
-    msg['heartbeat'] = datetime.utcnow().isoformat() if hb == '' else hb
+    msg['hb'] = datetime.utcnow().isoformat() if hb == '' else hb
     msg['tmhp_up'] = tmhp_up 
     msg['alerts'] = {}
     return msg
@@ -35,6 +35,8 @@ msgs['no_alert'] = json.dumps(gen_msg())
 msgs['tmhp_down'] = json.dumps(gen_msg(tmhp_up = False))
 msgs['hb_lag'] = \
    json.dumps(gen_msg(hb = (datetime.utcnow() - timedelta(minutes=10)).isoformat()))
+msgs['tmhp_down_hb_lag'] = \
+   json.dumps(gen_msg(tmhp_up = False, hb = (datetime.utcnow() - timedelta(minutes=10)).isoformat()))
 
 # MDS Batches Alert
 msg = gen_msg()
@@ -63,7 +65,7 @@ msg['alerts']['cfs_forms'] = gen_cfs_forms()
 msgs['alert_mds_cfs'] = json.dumps(msg)
 
 #  All Alerts
-msg = gen_msg()
+msg = gen_msg(tmhp_up = False, hb = (datetime.utcnow() - timedelta(minutes=10)).isoformat())
 msg['alerts']['mds_batches'] = gen_mds_batches()
 msg['alerts']['pbj_batches'] = gen_pbj_batches()
 msg['alerts']['overdue_reports'] = gen_overdue_reports()
