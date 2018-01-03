@@ -1,10 +1,14 @@
 import time
 import json
+import pickle
+import logging
 from cuepy import CorsairSDK
 from datetime import datetime, timedelta
 from itertools import cycle
 
 ### Setup ###
+
+logging.basicConfig(level=logging.DEBUG)
 
 #Led locations
 LED_LOGO = 148
@@ -13,7 +17,8 @@ LED_SCROLL = 150
 
 # Timer Settings (all in seconds)
 LED_DELAY = 1
-hb_threshold = 5 # Time in minutes
+UPDATE_DELAY = 20
+hb_threshold = 7 # Time in minutes
 iso_format = '%Y-%m-%dT%H:%M:%S' # Used to parse hb back into object
 
 #Corsair SDK library location
@@ -84,10 +89,8 @@ def process_msg(message):
     led_queue['logo'] = []
 
     msg = json.loads(message)
-    print('Processing Message: \n{}'.format(msg))
 
     # Make sure heartbeat isn't behind
-
     if bad_hb(msg['hb'], hb_threshold): led_queue['logo'].append(ALERT_HB)
     if msg['tmhp_up'] == False: led_queue['logo'].append(ALERT_TMHP)
 
@@ -106,8 +109,34 @@ def process_msg(message):
 
 # General run sequence
 def run():
-    init_device()
-    time.sleep(100)
+
+    logging.info('Corsair Alert Started')
+
+    # Initialize mouse
+    device = init_device()
+    msg = {}
+
+    # Set last run within threshold so it runs first
+    last_run = datetime.now() - (timedelta(seconds=UPDATE_DELAY + 1))
+    
+    while(1):
+
+	# Make sure we only update within the alloted time
+        if datetime.now() > last_run + timedelta(seconds=UPDATE_DELAY):
+            #Load new pickle file and process message
+            logging.debug('Updating Pickle')
+            with open('ops_status.pickle', 'rb') as f:
+                msg = pickle.load(f)
+                #logging.debug('New Pickle:\n{}'.format(msg))
+
+            msg# Increment last run
+            last_run = datetime.now()
+        
+        # Process message and cycle through queue
+        q = process_msg(json.dumps(msg))
+        process_leds(device, q)
+
+
 
 if __name__ == "__main__":
    run()
