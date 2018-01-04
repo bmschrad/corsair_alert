@@ -15,6 +15,15 @@ LED_LOGO = 148
 LED_BOTTOM = 149
 LED_SCROLL = 150
 
+
+# Headstand leds
+# Start from the back
+HS_BASE = \
+    [199, 192, 193, \
+     194, 195, 196, \
+     197, 198]
+HS_LOGO = 191
+
 # Timer Settings (all in seconds)
 LED_DELAY = 1
 UPDATE_DELAY = 20
@@ -22,7 +31,7 @@ hb_threshold = 7 # Time in minutes
 iso_format = '%Y-%m-%dT%H:%M:%S' # Used to parse hb back into object
 
 #Corsair SDK library location
-sdk = CorsairSDK("C:\\CUESDK.x64_2013.dll")
+sdk = CorsairSDK("C:\\CUESDK.x64_2015.dll")
 ### End Setup ###
 
 ### Warning Colors ###
@@ -52,6 +61,14 @@ def led_reset(device):
     device.set_led(LED_SCROLL,[0,0,0])
 
 
+# Change all Headset base colors
+def process_base_leds(device, color):
+    
+    for i in HS_BASE:
+        logging.debug('Processing base LED: {} to color {}'.format(i, color))
+        device.set_led(i, color)
+
+
 # Process lighting queue
 def process_leds(device, queus):
 
@@ -60,15 +77,17 @@ def process_leds(device, queus):
        i = cycle(queus['logo'])
        for q in queus['scroll']:
            print('SCROLL LOOP {}'.format(q))
-           device.set_led(LED_SCROLL,q)
-           device.set_led(LED_LOGO, next(i))
+           #device.set_led(LED_SCROLL,q)
+           process_base_leds(device, q)
+           device.set_led(HS_LOGO, next(i))
            time.sleep(LED_DELAY)
     else:
        i = cycle(queus['scroll'])
        for q in queus['logo']:
            print('LOGO LOOP {}'.format(q))
-           device.set_led(LED_LOGO,q)
-           device.set_led(LED_SCROLL, next(i))
+           device.set_led(HS_LOGO,q)
+           process_base_leds(device, next(i))
+           #device.set_led(LED_SCROLL, next(i))
            time.sleep(LED_DELAY)
 
 

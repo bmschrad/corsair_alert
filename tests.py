@@ -1,6 +1,7 @@
 from app import *
 from alert_msg_tests import *
 import time
+import logging
 
 WAIT_TIME = 5 
 
@@ -15,7 +16,7 @@ def run_tests():
 
     # Loop through test messages
     for m in msgs:
-        print('Running Message: {}'.format(m))
+        logging.info('Running Message: {}'.format(m))
         q = process_msg(msgs[m])
         process_leds(device, q)
         process_leds(device, q)
