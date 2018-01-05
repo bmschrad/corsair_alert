@@ -1,3 +1,4 @@
+import config
 import time
 import json
 import pickle
@@ -7,16 +8,12 @@ from datetime import datetime, timedelta
 from itertools import cycle
 
 ### Setup ###
-
-log_format = "%(asctime)s %(levelname)s: %(message)s"
-#logging.basicConfig(level=logging.DEBUG, format=log_format)
-logging.basicConfig(level=logging.INFO, format=log_format)
+logging.basicConfig(level=config.log_level, format=config.log_format)
 
 #Led locations
 LED_LOGO = 148
 LED_BOTTOM = 149
 LED_SCROLL = 150
-
 
 # Headstand leds
 # Start from the back
@@ -26,14 +23,10 @@ HS_BASE = \
      197, 198]
 HS_LOGO = 191
 
-# Timer Settings (all in seconds)
-LED_DELAY = 1
-UPDATE_DELAY = 20
-hb_threshold = 7 # Time in minutes
 iso_format = '%Y-%m-%dT%H:%M:%S' # Used to parse hb back into object
 
 #Corsair SDK library location
-sdk = CorsairSDK("C:\\CUESDK.x64_2015.dll")
+sdk = CorsairSDK(config.sdk_path)
 ### End Setup ###
 
 ### Warning Colors ###
@@ -52,12 +45,12 @@ ALERT_LOGO_DEFAULT = [0, 255, 0]
 # Init sequence
 def init_device():
    if(sdk.device_count() >= 1):
-       print('Found the following device:')
+       logging.info('Found the following device:')
        for k, v in sdk.device_info(0).items():
-           print('\t',k,v)
+           logging.info('\t{} {}'.format(k,v))
        return sdk.device(0)
    else:
-       print('No device found')
+       logging.error('No device found')
 
 
 # Reset all leds to off
@@ -82,19 +75,19 @@ def process_leds(device, queus):
     if(len(queus['scroll']) > len(queus['logo'])):
        i = cycle(queus['logo'])
        for q in queus['scroll']:
-           print('SCROLL LOOP {}'.format(q))
+           logging.debug('SCROLL LOOP {}'.format(q))
            #device.set_led(LED_SCROLL,q)
            process_base_leds(device, q)
            device.set_led(HS_LOGO, next(i))
-           time.sleep(LED_DELAY)
+           time.sleep(config.LED_DELAY)
     else:
        i = cycle(queus['scroll'])
        for q in queus['logo']:
-           print('LOGO LOOP {}'.format(q))
+           logging.debug('LOGO LOOP {}'.format(q))
            device.set_led(HS_LOGO,q)
            process_base_leds(device, next(i))
            #device.set_led(LED_SCROLL, next(i))
-           time.sleep(LED_DELAY)
+           time.sleep(config.LED_DELAY)
 
 
 # HB processing logic
@@ -116,7 +109,7 @@ def process_msg(message):
     msg = json.loads(message)
 
     # Make sure heartbeat isn't behind
-    if bad_hb(msg['hb'], hb_threshold): led_queue['logo'].append(ALERT_HB)
+    if bad_hb(msg['hb'], config.hb_threshold): led_queue['logo'].append(ALERT_HB)
     if msg['tmhp_up'] == False: led_queue['logo'].append(ALERT_TMHP)
 
     # Check for any alerts
@@ -136,25 +129,26 @@ def process_msg(message):
 def run():
 
     logging.info('Corsair Alert Started')
+    logging.info('Log Level: {}'.format(config.log_level))
 
     # Initialize mouse
     device = init_device()
     msg = {}
 
     # Set last run within threshold so it runs first
-    last_run = datetime.now() - (timedelta(seconds=UPDATE_DELAY + 1))
+    last_run = datetime.now() - (timedelta(seconds=config.UPDATE_DELAY + 1))
     
     while(1):
 
 	# Make sure we only update within the alloted time
-        if datetime.now() > last_run + timedelta(seconds=UPDATE_DELAY):
+        if datetime.now() > last_run + timedelta(seconds=config.UPDATE_DELAY):
             #Load new pickle file and process message
             logging.info('Updating Pickle')
-            with open('//stinkbug.simpleltc.local/personal/brandon/ops_status.pickle', 'rb') as f:
+            
+            with open(config.pickle_path, 'rb') as f:
                 msg = pickle.load(f)
-                #logging.debug('New Pickle:\n{}'.format(msg))
 
-            msg# Increment last run
+            # Increment last run
             last_run = datetime.now()
         
         # Process message and cycle through queue
