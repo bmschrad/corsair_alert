@@ -8,7 +8,9 @@ from itertools import cycle
 
 ### Setup ###
 
-logging.basicConfig(level=logging.DEBUG)
+log_format = "%(asctime)s %(levelname)s: %(message)s"
+#logging.basicConfig(level=logging.DEBUG, format=log_format)
+logging.basicConfig(level=logging.INFO, format=log_format)
 
 #Led locations
 LED_LOGO = 148
@@ -42,6 +44,10 @@ ALERT_PBJ = [255,255,0]
 ALERT_REPORTS = [0,255,0]
 ALERT_CFS = [0,0,255]
 ### End Warning Colors ###
+### Default Colors ###
+ALERT_SCROLL_DEFAULT = [0, 0, 0]
+ALERT_LOGO_DEFAULT = [0, 255, 0]
+### End Default Colors ###
 
 # Init sequence
 def init_device():
@@ -121,8 +127,8 @@ def process_msg(message):
         elif a == 'cfs_forms': led_queue['scroll'].append(ALERT_CFS)
 
     # If any of the queues are empty set them to the ok status
-    if(len(led_queue['scroll']) == 0): led_queue['scroll'].append([0,0,0])
-    if(len(led_queue['logo']) == 0): led_queue['logo'].append([0,0,10])
+    if(len(led_queue['scroll']) == 0): led_queue['scroll'].append(ALERT_SCROLL_DEFAULT)
+    if(len(led_queue['logo']) == 0): led_queue['logo'].append(ALERT_LOGO_DEFAULT)
     
     return led_queue
 
@@ -143,8 +149,8 @@ def run():
 	# Make sure we only update within the alloted time
         if datetime.now() > last_run + timedelta(seconds=UPDATE_DELAY):
             #Load new pickle file and process message
-            logging.debug('Updating Pickle')
-            with open('ops_status.pickle', 'rb') as f:
+            logging.info('Updating Pickle')
+            with open('//stinkbug.simpleltc.local/personal/brandon/ops_status.pickle', 'rb') as f:
                 msg = pickle.load(f)
                 #logging.debug('New Pickle:\n{}'.format(msg))
 
