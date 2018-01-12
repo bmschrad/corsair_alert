@@ -12,5 +12,5 @@ hb_threshold = os.getenv("HB_THRESHOLD", 7) # (minutes) define when hb is too
 # File Settings
 sdk_path = "C:\\CUESDK.x64_2015.dll"
 
-#ops_api_uri = os.environ.get("OPS_API_URI")
 ops_api_uri = os.getenv("OPS_API_URI", None)
+api_crt = os.getenv("OPS_API_CRT", None)

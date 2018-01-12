@@ -65,7 +65,7 @@ def led_reset(device):
 def process_base_leds(device, color):
     
     for i in HS_BASE:
-        logging.debug('Processing base LED: {} to color {}'.format(i, color))
+        #logging.debug('Processing base LED: {} to color {}'.format(i, color))
         device.set_led(i, color)
 
 
@@ -76,14 +76,14 @@ def process_leds(device, queus):
     if(len(queus['base']) > len(queus['logo'])):
        i = cycle(queus['logo'])
        for q in queus['base']:
-           logging.debug('BASE LOOP {}'.format(q))
+           #logging.debug('BASE LOOP {}'.format(q))
            process_base_leds(device, q)
            device.set_led(HS_LOGO, next(i))
            time.sleep(config.LED_DELAY)
     else:
        i = cycle(queus['base'])
        for q in queus['logo']:
-           logging.debug('LOGO LOOP {}'.format(q))
+           #logging.debug('LOGO LOOP {}'.format(q))
            device.set_led(HS_LOGO,q)
            process_base_leds(device, next(i))
            time.sleep(config.LED_DELAY)
@@ -143,7 +143,7 @@ def process_ops_api():
     uri = '{}/status/health'.format(config.ops_api_uri)
     logging.debug('Requesting status from: {}'.format(uri))
     
-    res = requests.get(uri)
+    res = requests.get(url=uri, verify=config.api_crt)
     if res.ok:
         logging.info('Updated from API')
         return res.text
@@ -169,10 +169,10 @@ def run(get_msg_proc):
 
             # Time to get the new message
             new_msg = get_msg_proc()
-            logging.info('{}'.format(json.dumps(new_msg, indent=2, sort_keys=True)))
 
             # Make sure we get a message back then process
             if new_msg != '':
+                logging.debug('{}'.format(json.dumps(json.loads(new_msg), indent=2, sort_keys=True)))
                 msg = new_msg
                 # Increment last run
                 last_run = datetime.now()
