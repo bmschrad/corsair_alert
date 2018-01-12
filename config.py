@@ -1,7 +1,6 @@
 import os
 
 # Logging setup
-
 log_format = os.getenv("P_LOG_FORMAT", "%(asctime)s %(levelname)s: %(message)s")
 log_level = os.getenv("P_LOG_LEVEL", "INFO")
 
@@ -12,4 +11,6 @@ hb_threshold = os.getenv("HB_THRESHOLD", 7) # (minutes) define when hb is too
 
 # File Settings
 sdk_path = "C:\\CUESDK.x64_2015.dll"
-pickle_path = os.getenv("PATH_PICKLE","ops_status.pickle")
+
+#ops_api_uri = os.environ.get("OPS_API_URI")
+ops_api_uri = os.getenv("OPS_API_URI", None)

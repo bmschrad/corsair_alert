@@ -1,4 +1,5 @@
 import config
+import requests
 import time
 import json
 import pickle
@@ -27,6 +28,7 @@ iso_format = '%Y-%m-%dT%H:%M:%S' # Used to parse hb back into object
 
 #Corsair SDK library location
 sdk = CorsairSDK(config.sdk_path)
+PICKLE_PATH = ''
 ### End Setup ###
 
 ### Warning Colors ###
@@ -37,9 +39,10 @@ ALERT_PBJ = [255,255,0]
 ALERT_REPORTS = [0,255,0]
 ALERT_CFS = [0,0,255]
 ### End Warning Colors ###
+
 ### Default Colors ###
-ALERT_SCROLL_DEFAULT = [0, 0, 0]
-ALERT_LOGO_DEFAULT = [0, 255, 0]
+ALERT_LOGO_DEFAULT = [0, 0, 0]
+ALERT_BASE_DEFAULT = [0, 255, 0]
 ### End Default Colors ###
 
 # Init sequence
@@ -55,9 +58,7 @@ def init_device():
 
 # Reset all leds to off
 def led_reset(device):
-    device.set_led(LED_LOGO,[0,0,0])
-    device.set_led(LED_BOTTOM,[0,0,0])
-    device.set_led(LED_SCROLL,[0,0,0])
+    process_base_leds(device,[0,0,0])
 
 
 # Change all Headset base colors
@@ -72,21 +73,19 @@ def process_base_leds(device, color):
 def process_leds(device, queus):
 
     #Find out which queus is larger and use that for the driver
-    if(len(queus['scroll']) > len(queus['logo'])):
+    if(len(queus['base']) > len(queus['logo'])):
        i = cycle(queus['logo'])
-       for q in queus['scroll']:
-           logging.debug('SCROLL LOOP {}'.format(q))
-           #device.set_led(LED_SCROLL,q)
+       for q in queus['base']:
+           logging.debug('BASE LOOP {}'.format(q))
            process_base_leds(device, q)
            device.set_led(HS_LOGO, next(i))
            time.sleep(config.LED_DELAY)
     else:
-       i = cycle(queus['scroll'])
+       i = cycle(queus['base'])
        for q in queus['logo']:
            logging.debug('LOGO LOOP {}'.format(q))
            device.set_led(HS_LOGO,q)
            process_base_leds(device, next(i))
-           #device.set_led(LED_SCROLL, next(i))
            time.sleep(config.LED_DELAY)
 
 
@@ -95,7 +94,7 @@ def bad_hb(heartbeat, th):
     # Remove the microseconds to make it easier on ourselves
     heartbeat = heartbeat.split('.')[0]
     hb = datetime.strptime(heartbeat, iso_format)
-    deadline = datetime.utcnow() - timedelta(minutes=th)
+    deadline = datetime.now() - timedelta(minutes=th)
     return deadline > hb
 
 
@@ -103,33 +102,58 @@ def bad_hb(heartbeat, th):
 def process_msg(message):
 
     led_queue = {}
-    led_queue['scroll'] = []
+    led_queue['base'] = []
     led_queue['logo'] = []
 
     msg = json.loads(message)
 
     # Make sure heartbeat isn't behind
-    if bad_hb(msg['hb'], config.hb_threshold): led_queue['logo'].append(ALERT_HB)
-    if msg['tmhp_up'] == False: led_queue['logo'].append(ALERT_TMHP)
+    if bad_hb(msg['hb'], config.hb_threshold): led_queue['base'].append(ALERT_HB)
+    if msg['tmhp_up'] == False: led_queue['base'].append(ALERT_TMHP)
 
     # Check for any alerts
     for a in msg['alerts']:
-        if a == 'mds_batches': led_queue['scroll'].append(ALERT_MDS)
-        elif a == 'pbj_batches': led_queue['scroll'].append(ALERT_PBJ)
-        elif a == 'overdue_reports': led_queue['scroll'].append(ALERT_REPORTS)
-        elif a == 'cfs_forms': led_queue['scroll'].append(ALERT_CFS)
+        if a == 'mds_batches': led_queue['logo'].append(ALERT_MDS)
+        elif a == 'pbj_batches': led_queue['logo'].append(ALERT_PBJ)
+        elif a == 'overdue_reports': led_queue['logo'].append(ALERT_REPORTS)
+        elif a == 'cfs_forms': led_queue['logo'].append(ALERT_CFS)
 
     # If any of the queues are empty set them to the ok status
-    if(len(led_queue['scroll']) == 0): led_queue['scroll'].append(ALERT_SCROLL_DEFAULT)
+    if(len(led_queue['base']) == 0): led_queue['base'].append(ALERT_BASE_DEFAULT)
     if(len(led_queue['logo']) == 0): led_queue['logo'].append(ALERT_LOGO_DEFAULT)
     
     return led_queue
 
-# General run sequence
-def run():
 
-    logging.info('Corsair Alert Started')
-    logging.info('Log Level: {}'.format(config.log_level))
+# Get Pickle File message
+def process_pickle():
+    
+    #Load new pickle file
+    with open(PICKLE_PATH, 'rb') as f:
+        msg = pickle.load(f)
+
+    logging.info('Updating Pickle')
+    return json.dumps(msg)
+
+
+# Get Ops Api message
+def process_ops_api():
+    
+    #Load new ops api status
+    uri = '{}/status/health'.format(config.ops_api_uri)
+    logging.debug('Requesting status from: {}'.format(uri))
+    
+    res = requests.get(uri)
+    if res.ok:
+        logging.info('Updated from API')
+        return res.text
+    else:
+        logging.error('API Returned: {}, {}'.format(res.status_code, res.text))
+        return ''
+
+
+# General run sequence
+def run(get_msg_proc):
 
     # Initialize mouse
     device = init_device()
@@ -142,20 +166,49 @@ def run():
 
 	# Make sure we only update within the alloted time
         if datetime.now() > last_run + timedelta(seconds=config.UPDATE_DELAY):
-            #Load new pickle file and process message
-            logging.info('Updating Pickle')
-            
-            with open(config.pickle_path, 'rb') as f:
-                msg = pickle.load(f)
 
-            # Increment last run
-            last_run = datetime.now()
-        
-        # Process message and cycle through queue
-        q = process_msg(json.dumps(msg))
+            # Time to get the new message
+            new_msg = get_msg_proc()
+            logging.info('{}'.format(json.dumps(new_msg, indent=2, sort_keys=True)))
+
+            # Make sure we get a message back then process
+            if new_msg != '':
+                msg = new_msg
+                # Increment last run
+                last_run = datetime.now()
+
+        q = process_msg(msg)
         process_leds(device, q)
+        
 
+
+def get_parser():
+    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+    parser = ArgumentParser(description=__doc__, \
+                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument("-f", "--file", \
+                        dest="filename", \
+                        help="write output to pickle file", \
+                        metavar="FILE")
+    return parser
 
 
 if __name__ == "__main__":
-   run()
+
+    logging.info('Corsair Alert Started')
+
+    # See what we need to set our output to
+    args = get_parser().parse_args()
+    if args.filename is not None:
+        PICKLE_PATH = args.filename
+        logging.info('Pickle Path: {}'.format(PICKLE_PATH))
+        get_msg_proc = process_pickle
+    else:
+        if config.ops_api_uri is not None:
+            logging.info('Ops API URI: {}'.format(config.ops_api_uri))
+            get_msg_proc = process_ops_api
+        else:
+            logging.error("PICKLE_PATH or OPS_API_URI enviroment variable not set")
+            exit()
+    
+    run(get_msg_proc)
