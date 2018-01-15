@@ -38,6 +38,7 @@ ALERT_MDS = [255,0,0]
 ALERT_PBJ = [255,255,0]
 ALERT_REPORTS = [0,255,0]
 ALERT_CFS = [0,0,255]
+ALERT_CFS_LTCMI = [0,0,128]
 ### End Warning Colors ###
 
 ### Default Colors ###
@@ -116,7 +117,13 @@ def process_msg(message):
         if a == 'mds_batches': led_queue['logo'].append(ALERT_MDS)
         elif a == 'pbj_batches': led_queue['logo'].append(ALERT_PBJ)
         elif a == 'overdue_reports': led_queue['logo'].append(ALERT_REPORTS)
-        elif a == 'cfs_forms': led_queue['logo'].append(ALERT_CFS)
+        elif a == 'cfs_forms': 
+            # See if any of the forms are LTCMI
+            has_ltcmi = False
+            for i in msg['alerts'][a]:
+                if i['form_type'] == 'LTCMI 3': has_ltcmi = True
+            if has_ltcmi: led_queue['logo'].append(ALERT_CFS_LTCMI)
+            led_queue['logo'].append(ALERT_CFS)
 
     # If any of the queues are empty set them to the ok status
     if(len(led_queue['base']) == 0): led_queue['base'].append(ALERT_BASE_DEFAULT)
